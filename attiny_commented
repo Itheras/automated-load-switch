@@ -1,0 +1,81 @@
+// Number of iterations to measure the current
+#define ITERATIONS 300  
+
+// Analog pin for reading the ACS712 sensor 
+#define INPUT_PIN 3       
+
+// Control relay output pin
+#define RELAY_PIN 2        
+
+// Specifies the current (in Amps) that the sensor is rated for
+#define SENSOR_TYPE 20    
+
+// Variables to store peak values and sensor precision
+float highPeak, lowPeak, sensorPrecision;
+
+// Variables to store the peak-to-peak and RMS values
+float peakToPeakValue, rmsValue;
+
+// Timestamps to track when the relay was last turned off and on
+unsigned long previousMillis = 0;
+unsigned long currentMillis = 0;
+
+// Time interval (in milliseconds) after which the relay should turn off if the current is below the threshold
+const long INTERVAL = 5000;
+
+void setup() {
+  // Set the input and output pins
+  pinMode(INPUT_PIN, INPUT);
+  pinMode(RELAY_PIN, OUTPUT);
+  
+  // Turn on the relay initially
+  digitalWrite(RELAY_PIN, HIGH);
+  
+  // Calculate the precision of the sensor (in Volts) per step
+  sensorPrecision = 1024.0 / (SENSOR_TYPE * 1000.0);
+}
+
+void loop() {
+  // Measure the current values
+  measureCurrent();
+  
+  // Calculate the RMS value
+  rmsValue = peakToPeakValue * 0.3536 * sensorPrecision;     
+
+  // If the RMS value is above the threshold, turn off the relay
+  if (rmsValue > 0.2) {
+    digitalWrite(RELAY_PIN, LOW);
+    previousMillis = millis();
+  } 
+  // If the RMS value is below the threshold, turn on the relay if the interval has passed
+  else {
+    currentMillis = millis();
+    if (currentMillis - previousMillis >= INTERVAL) {
+      previousMillis = currentMillis;
+      digitalWrite(RELAY_PIN, HIGH);
+    }
+  }
+  
+  // Delay to control the loop rate
+  delay(200);
+}
+
+// Function to measure the current values
+void measureCurrent() {     
+  int iteration;
+  // Initialize the peak values to their minimum and maximum possible values
+  highPeak = 0;
+  lowPeak = 1024;
+
+  // Loop through all iterations to determine the high and low peaks
+  for (iteration = 0; iteration < ITERATIONS; iteration++) {          
+    float sensorValue = analogRead(INPUT_PIN); 
+    if(sensorValue > highPeak){               
+      highPeak = sensorValue;            
+    } else if(sensorValue < lowPeak) {
+      lowPeak = sensorValue;
+    }
+  }
+  // Calculate the peak-to-peak value
+  peakToPeakValue = highPeak - lowPeak;
+}
